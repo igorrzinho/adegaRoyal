@@ -1,0 +1,378 @@
+# Adega Royal API - HTTP Test Examples
+
+This file contains HTTP requests for testing all Adega Royal API endpoints.
+Use with VS Code REST Client extension or similar tools.
+
+## Environment Variables
+
+Set your host and token before running tests:
+```
+@host = http://localhost:5000
+@token = YOUR_KEYCLOAK_JWT_TOKEN_HERE
+@adminToken = YOUR_ADMIN_JWT_TOKEN_HERE
+@userId = sub-claim-from-token
+@categoryId = category-guid-here
+@productId = product-guid-here
+@orderId = order-guid-here
+```
+
+---
+
+## CATEGORIES ENDPOINTS
+
+### 1. GET All Categories (Public)
+```http
+GET {{host}}/api/categories
+Accept: application/json
+```
+
+### 2. GET Category by ID (Public)
+```http
+GET {{host}}/api/categories/@categoryId
+Accept: application/json
+```
+
+### 3. POST Create Category (Admin)
+```http
+POST {{host}}/api/categories
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Red Wines",
+  "description": "Premium red wine selection from around the world"
+}
+```
+
+### 4. PUT Update Category (Admin)
+```http
+PUT {{host}}/api/categories/@categoryId
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Red Wines - Premium",
+  "description": "Updated premium red wine selection"
+}
+```
+
+### 5. DELETE Category (Admin)
+```http
+DELETE {{host}}/api/categories/@categoryId
+Authorization: Bearer {{adminToken}}
+```
+
+---
+
+## PRODUCTS ENDPOINTS
+
+### 1. GET All Products (Public)
+```http
+GET {{host}}/api/products
+Accept: application/json
+```
+
+### 2. GET Products by Category (Public)
+```http
+GET {{host}}/api/products?categoryId=@categoryId
+Accept: application/json
+```
+
+### 3. GET Product by ID (Public)
+```http
+GET {{host}}/api/products/@productId
+Accept: application/json
+```
+
+### 4. POST Create Product (Admin)
+```http
+POST {{host}}/api/products
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Vinho Tinto Reserva 2015",
+  "description": "Premium red wine from Douro Valley with 40 months aging",
+  "price": 199.90,
+  "stockQuantity": 50,
+  "imageUrl": "https://cdn.adegaroyal.com/products/vinho-tinto-reserva-2015.jpg",
+  "categoryId": "@categoryId"
+}
+```
+
+### 5. PUT Update Product (Admin)
+```http
+PUT {{host}}/api/products/@productId
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "name": "Vinho Tinto Reserva 2015 - Premium Edition",
+  "price": 249.90,
+  "stockQuantity": 35
+}
+```
+
+### 6. DELETE Product (Admin)
+```http
+DELETE {{host}}/api/products/@productId
+Authorization: Bearer {{adminToken}}
+```
+
+---
+
+## ORDERS ENDPOINTS
+
+### 1. GET User Orders (Authorized)
+```http
+GET {{host}}/api/orders
+Authorization: Bearer {{token}}
+Accept: application/json
+```
+
+Returns all orders for the authenticated user (filtered by sub claim).
+
+### 2. GET Specific Order (Authorized)
+```http
+GET {{host}}/api/orders/@orderId
+Authorization: Bearer {{token}}
+Accept: application/json
+```
+
+User can only view their own orders. Admin can view all.
+
+### 3. POST Create Order (Authorized)
+```http
+POST {{host}}/api/orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "items": [
+    {
+      "productId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "quantity": 2
+    },
+    {
+      "productId": "4gb96g75-6718-5563-c3fd-3d074g77bgb7",
+      "quantity": 1
+    }
+  ],
+  "notes": "Please deliver after 3 PM"
+}
+```
+
+**Validations**:
+- Order must contain at least 1 item
+- All products must have sufficient stock
+- Stock is automatically deducted upon order creation
+
+**Response** (201 Created):
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "userId": "keycloak-user-id",
+  "createdAt": "2026-04-23T15:30:45.123Z",
+  "totalAmount": 449.80,
+  "status": "Pending",
+  "notes": "Please deliver after 3 PM",
+  "orderItems": [
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440111",
+      "productId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "quantity": 2,
+      "unitPrice": 199.90,
+      "createdAt": "2026-04-23T15:30:45.123Z",
+      "product": {
+        "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+        "name": "Vinho Tinto Reserva 2015",
+        "price": 199.90,
+        "stockQuantity": 48,
+        "imageUrl": "https://...",
+        "categoryId": "...",
+        "createdAt": "2026-04-20T10:00:00Z",
+        "updatedAt": "2026-04-23T15:30:45.123Z"
+      }
+    }
+  ]
+}
+```
+
+### 4. PATCH Update Order Status (Admin)
+```http
+PATCH {{host}}/api/orders/@orderId/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "Shipped"
+}
+```
+
+**Valid statuses**: Pending, Paid, Shipped, Delivered, Cancelled, Returned
+
+### 5. DELETE Order (Authorized)
+```http
+DELETE {{host}}/api/orders/@orderId
+Authorization: Bearer {{token}}
+```
+
+**Restrictions**:
+- Only the order owner can delete (unless admin)
+- Only Pending orders can be deleted
+- Deleting an order restores the stock
+
+**Error Response** (400 Bad Request):
+```json
+{
+  "message": "Only pending orders can be deleted"
+}
+```
+
+---
+
+## ERROR RESPONSES
+
+### Product Not Found
+```json
+HTTP/1.1 404 Not Found
+Content-Type: application/json
+
+{
+  "message": "Product not found"
+}
+```
+
+### Insufficient Stock
+```json
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "message": "Insufficient stock for product ID 3fa85f64-5717-4562-b3fc-2c963f66afa6"
+}
+```
+
+### Unauthorized
+```json
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+
+{
+  "message": "Unable to determine user identity"
+}
+```
+
+### Validation Error
+```json
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "message": "Order must contain at least one item"
+}
+```
+
+---
+
+## DIAGNOSTIC ENDPOINTS
+
+### Health Check
+```http
+GET {{host}}/health
+Accept: application/json
+```
+
+**Response**:
+```json
+{
+  "status": "healthy",
+  "timestamp": "2026-04-23T15:30:45.123Z"
+}
+```
+
+### Get Current User Info
+```http
+GET {{host}}/users/me
+Authorization: Bearer {{token}}
+Accept: application/json
+```
+
+**Response**:
+```json
+{
+  "sub": "keycloak-user-id",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "User Name"
+}
+```
+
+---
+
+## REACT NATIVE INTEGRATION EXAMPLE
+
+```typescript
+const API_BASE_URL = "http://YOUR_API_IP:5000";
+
+// Get Products
+const fetchProducts = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/products`);
+  const products = await response.json();
+  return products; // Already in camelCase format
+};
+
+// Get Categories
+const fetchCategories = async () => {
+  const response = await fetch(`${API_BASE_URL}/api/categories`);
+  const categories = await response.json();
+  return categories;
+};
+
+// Create Order (with authentication)
+const createOrder = async (token, items) => {
+  const response = await fetch(`${API_BASE_URL}/api/orders`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ items, notes: "" }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message);
+  }
+
+  return response.json();
+};
+
+// Get User Orders
+const fetchUserOrders = async (token) => {
+  const response = await fetch(`${API_BASE_URL}/api/orders`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return response.json();
+};
+```
+
+---
+
+## TESTING CHECKLIST
+
+- [ ] GET all categories (anonymous)
+- [ ] GET single product (anonymous)
+- [ ] Filter products by category (anonymous)
+- [ ] Create order as authenticated user
+- [ ] Verify stock deduction
+- [ ] Retrieve user orders
+- [ ] Test insufficient stock error
+- [ ] Admin create product
+- [ ] Admin update order status
+- [ ] User delete pending order
+- [ ] CORS headers present in responses
+- [ ] Dates in ISO 8601 format
+- [ ] Enum values serialized as strings (Pending, Paid, etc.)

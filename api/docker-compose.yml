@@ -1,0 +1,64 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: keycloak-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=Keycloak!123
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Keycloak!123' -Q 'SELECT 1' -C"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+
+  import-tool:
+    image: mcr.microsoft.com/dotnet/sdk:10.0
+    container_name: import-tool
+    volumes:
+      - ./Bacpac:/container_backup
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        set -e
+        echo "Atualizando pacotes..."
+        apt-get update && apt-get install -y libicu-dev
+        
+        echo "Instalando SqlPackage..."
+        dotnet tool install --global Microsoft.SqlPackage
+        
+        export PATH="/root/.dotnet/tools:$$PATH"
+        
+        echo "Iniciando importação do Keycloak.bacpac..."
+        sqlpackage /Action:Import /SourceFile:/container_backup/Keycloak.bacpac /TargetServerName:sqlserver /TargetDatabaseName:Keycloak /TargetUser:sa /TargetPassword:Keycloak!123 /TargetTrustServerCertificate:True
+        
+        echo "Importação do Keycloak.bacpac concluída!"
+        
+        echo "Iniciando importação do AppTaskDb.bacpac..."
+        sqlpackage /Action:Import /SourceFile:/container_backup/AppTaskDb.bacpac /TargetServerName:sqlserver /TargetDatabaseName:AppTaskDb /TargetUser:sa /TargetPassword:Keycloak!123 /TargetTrustServerCertificate:True
+        
+        echo "Importação do AppTaskDb.bacpac concluída!"
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak-server
+    command: start-dev
+    environment:
+      - KC_DB=mssql
+      - KC_DB_URL=jdbc:sqlserver://sqlserver:1433;databaseName=Keycloak;encrypt=true;trustServerCertificate=true;
+      - KC_DB_USERNAME=sa
+      - KC_DB_PASSWORD=Keycloak!123
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HTTP_ENABLED=true
+      - KC_HOSTNAME_STRICT=false
+    depends_on:
+      import-tool:
+        condition: service_completed_successfully
+    ports:
+      - "8080:8080"
