@@ -33,7 +33,11 @@ builder.Services.AddCors(options =>
 });
 
 // === CONTROLLERS AND JSON SERIALIZATION ===
-builder.Services.AddControllers()
+builder.Services.AddControllers(options => 
+    {
+        // Apply user sync globally on all requests
+        options.Filters.Add<SyncKeycloakUserFilter>();
+    })
     .AddJsonOptions(options =>
     {
         // Prevent JSON Object Cycle errors
@@ -129,6 +133,15 @@ builder.Services
 // === BUILD APPLICATION ===
 WebApplication app = builder.Build();
 
+// === AUTO-MIGRATION ===
+// Applies any pending EF Core migrations automatically on startup.
+// Ensures the database schema is always up to date without manual intervention.
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
 // === MIDDLEWARE ===
 if (app.Environment.IsDevelopment())
 {
@@ -140,6 +153,7 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+
 
 // === DIAGNOSTIC ENDPOINTS ===
 app.MapGet("/users/me", (ClaimsPrincipal claimsPrincipal) =>

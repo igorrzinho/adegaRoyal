@@ -60,6 +60,15 @@ public class UserService(AppDbContext context) : IUserService
             .ToListAsync();
     }
 
+    public async Task SetRoleAsync(Guid userId, UserRole role)
+    {
+        var user = await context.Users.FindAsync(userId);
+        if (user == null) return;
+
+        user.Role = role;
+        await context.SaveChangesAsync();
+    }
+
     private static UserDto MapToDto(User user) => new()
     {
         Id = user.Id,

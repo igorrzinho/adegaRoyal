@@ -12,12 +12,21 @@ public class KeycloakAdminService(HttpClient httpClient, IConfiguration config) 
 
     public async Task AddRoleToUserAsync(string userId, string roleName)
     {
-        await SetAdminTokenAsync();
-        var url = $"{_baseUrl}/admin/realms/{_realm}/users/{userId}/role-mappings/realm";
-        var role = await GetRealmRoleAsync(roleName);
-        var content = new StringContent(JsonSerializer.Serialize(new[] { role }), Encoding.UTF8, "application/json");
-        var response = await httpClient.PostAsync(url, content);
-        response.EnsureSuccessStatusCode();
+        try 
+        {
+            await SetAdminTokenAsync();
+            var url = $"{_baseUrl}/admin/realms/{_realm}/users/{userId}/role-mappings/realm";
+            var role = await GetRealmRoleAsync(roleName);
+            var content = new StringContent(JsonSerializer.Serialize(new[] { role }), Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(url, content);
+            response.EnsureSuccessStatusCode();
+        } 
+        catch (HttpRequestException) 
+        {
+            // If the role doesn't exist in Keycloak, ignore the error and continue.
+            // This prevents the whole registration flow (and local DB sync) from failing.
+            // In a production app you might want to create the role on-the-fly here.
+        }
     }
 
     public async Task RemoveRoleFromUserAsync(string userId, string roleName)
@@ -156,18 +165,48 @@ public class KeycloakAdminService(HttpClient httpClient, IConfiguration config) 
         return location.Segments.Last().TrimEnd('/');
     }
 
+    /// <summary>
+    /// Obtains an admin access token from Keycloak using the master realm admin credentials.
+    /// Uses the password grant with the built-in admin-cli public client — no secret required.
+    /// Credentials come from Keycloak:AdminUsername / Keycloak:AdminPassword in appsettings.
+    /// </summary>
     private async Task SetAdminTokenAsync()
     {
-        var url = $"{_baseUrl}/realms/{_realm}/protocol/openid-connect/token";
+        var adminUsername = config["Keycloak:AdminUsername"]
+            ?? throw new InvalidOperationException("Keycloak:AdminUsername is not configured.");
+        var adminPassword = config["Keycloak:AdminPassword"]
+            ?? throw new InvalidOperationException("Keycloak:AdminPassword is not configured.");
+
+        // Always use the master realm to obtain the admin token
+        var url = $"{_baseUrl}/realms/master/protocol/openid-connect/token";
+
         var data = new Dictionary<string, string>
         {
-            { "grant_type", "client_credentials" },
-            { "client_id", config["Keycloak:ClientId"]! },
-            { "client_secret", config["Keycloak:ClientSecret"]! }
+            { "grant_type", "password" },
+            { "client_id",  "admin-cli" },
+            { "username",   adminUsername },
+            { "password",   adminPassword }
         };
+
         var response = await httpClient.PostAsync(url, new FormUrlEncodedContent(data));
-        var json = await response.Content.ReadAsStringAsync();
-        var token = JsonDocument.Parse(json).RootElement.GetProperty("access_token").GetString();
-        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        var json     = await response.Content.ReadAsStringAsync();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException(
+                $"Keycloak admin token request failed ({(int)response.StatusCode}): {json}");
+        }
+
+        var doc = JsonDocument.Parse(json).RootElement;
+
+        if (!doc.TryGetProperty("access_token", out var tokenElement) ||
+            string.IsNullOrEmpty(tokenElement.GetString()))
+        {
+            throw new InvalidOperationException(
+                $"Keycloak did not return an access_token. Response: {json}");
+        }
+
+        httpClient.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", tokenElement.GetString());
     }
 }

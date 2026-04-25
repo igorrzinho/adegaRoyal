@@ -23,4 +23,7 @@ public interface IUserService
 
     /// <summary>Returns all users (admin only).</summary>
     Task<IEnumerable<UserDto>> GetAllAsync();
+
+    /// <summary>Updates the local UserRole of a user (used after Keycloak role assignment).</summary>
+    Task SetRoleAsync(Guid userId, Enums.UserRole role);
 }

@@ -138,7 +138,13 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .IsRequired()
                 .HasMaxLength(200);
 
-            // 1:1 relationship with User (via KeycloakId)
+            // Cart is the DEPENDENT side of the 1:1 with User.
+            // UserId stores the User.KeycloakId (string FK).
+            // We intentionally do NOT use a direct PK-FK to User here
+            // because User.Id is a Guid while Cart.UserId is the KeycloakId string.
+            // Navigation is informational only — no EF-enforced FK to User table.
+            entity.Ignore(c => c.User);
+
             entity.HasIndex(c => c.UserId)
                 .IsUnique()
                 .HasDatabaseName("UX_Cart_UserId");
@@ -194,6 +200,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Property(o => o.UserId)
                 .IsRequired()
                 .HasMaxLength(200);
+
+            // Order.UserId is the Keycloak ID (string), not a FK to User.Id (Guid).
+            // Ignore the navigation to avoid EF creating a shadow property UserId1.
+            entity.Ignore(o => o.User);
 
             entity.Property(o => o.CreatedAt)
                 .HasDefaultValueSql("GETUTCDATE()");

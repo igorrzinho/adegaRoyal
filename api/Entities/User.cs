@@ -17,8 +17,4 @@ public class User(string keycloakId, string name, string email, UserRole role = 
     public UserRole Role { get; set; } = role;
     public DateTime CreatedAt { get; init; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
-
-    // Navigation properties
-    public Cart? Cart { get; set; }
-    public ICollection<Order> Orders { get; set; } = new List<Order>();
 }
