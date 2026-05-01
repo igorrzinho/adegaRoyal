@@ -28,13 +28,22 @@ services:
       - -c
       - |
         set -e
-        echo "Atualizando pacotes..."
+        echo "Verificando se o banco Keycloak já tem dados..."
         apt-get update && apt-get install -y libicu-dev
         
         echo "Instalando SqlPackage..."
         dotnet tool install --global Microsoft.SqlPackage
         
         export PATH="/root/.dotnet/tools:$$PATH"
+        
+        # Verificar se o banco Keycloak já tem tabelas
+        echo "Verificando se o banco Keycloak já tem dados..."
+        TABLE_COUNT=$(sqlcmd -S sqlserver -U sa -P 'Keycloak!123' -Q "USE Keycloak; SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';" -h -1 2>/dev/null || echo "0")
+        
+        if [ "$TABLE_COUNT" -gt "0" ]; then
+          echo "Banco Keycloak já tem $TABLE_COUNT tabelas. Pulando importação."
+          exit 0
+        fi
         
         echo "Iniciando importação do Keycloak.bacpac..."
         sqlpackage /Action:Import /SourceFile:/container_backup/Keycloak.bacpac /TargetServerName:sqlserver /TargetDatabaseName:Keycloak /TargetUser:sa /TargetPassword:Keycloak!123 /TargetTrustServerCertificate:True
@@ -73,15 +82,15 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
       - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=AppTaskDb;User Id=sa;Password=Keycloak!123;TrustServerCertificate=True;
-      - Keycloak__BaseUrl=http://keycloak:8080
+      - Keycloak__BaseUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080
       - Keycloak__Realm=auth-demo
       - Keycloak__AdminUsername=admin
       - Keycloak__AdminPassword=admin
       - Keycloak__PublicClientId=public-client
-      - Keycloak__AuthorizationUrl=http://keycloak:8080/realms/auth-demo/protocol/openid-connect/auth
-      - Keycloak__TokenUrl=http://keycloak:8080/realms/auth-demo/protocol/openid-connect/token
-      - Authentication__MetadataAddress=http://keycloak:8080/realms/auth-demo/.well-known/openid-configuration
-      - Authentication__ValidIssuer=http://keycloak:8080/realms/auth-demo
+      - Keycloak__AuthorizationUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo/protocol/openid-connect/auth
+      - Keycloak__TokenUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo/protocol/openid-connect/token
+      - Authentication__MetadataAddress=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo/.well-known/openid-configuration
+      - Authentication__ValidIssuer=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo
       - Authentication__ClientId=public-client
     ports:
       - "8000:8000"
