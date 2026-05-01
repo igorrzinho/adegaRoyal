@@ -1,13 +1,11 @@
 services:
-  # ==========================================
-  # SERVIÇO 1: KEYCLOAK (Imagem externa)
-  # ==========================================
   - type: web
     name: adega-keycloak
     plan: free 
     runtime: docker
-    image: quay.io/keycloak/keycloak:latest
-    command: start-dev 
+    image: 
+      url: quay.io/keycloak/keycloak:26.6.1
+    startCommand: start-dev 
     envVars:
       - key: KC_DB
         value: postgres
@@ -32,23 +30,19 @@ services:
       - key: KC_DB_POOL_MAX_SIZE
         value: "2"
 
-  # ==========================================
-  # SERVIÇO 2: API .NET (Código fonte em /api)
-  # ==========================================
   - type: web
     name: adega-api
     plan: free
     runtime: docker
-    rootDir: api # <-- AQUI ESTÁ O SEGREDO! O Render entra nesta pasta antes de fazer o build.
-    dockerfilePath: ./Dockerfile # Procura o Dockerfile dentro de /api
-    dockerContext: . # Executa o comando docker build de dentro de /api
+    rootDir: api 
+    dockerfilePath: ./Dockerfile 
+    dockerContext: . 
     envVars:
       - key: ASPNETCORE_ENVIRONMENT
         value: Development
       - key: ConnectionStrings__DefaultConnection
         value: postgresql://neondb_owner:npg_OwuCLEAoh9G5@ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       
-      # Integração com o Keycloak acima
       - key: Keycloak__BaseUrl
         value: https://adega-keycloak.onrender.com
       - key: Keycloak__Realm
