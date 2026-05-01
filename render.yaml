@@ -8,7 +8,7 @@ services:
       - key: PORT
         value: "8080"
       - key: KC_PROXY
-        value: edge
+        value: xforwarded
       - key: KC_DB
         value: postgres
       - key: KC_DB_URL
@@ -29,8 +29,6 @@ services:
         value: adega-keycloak.onrender.com
       - key: JAVA_OPTS_APPEND
         value: "-Xms256m -Xmx512m"
-      - key: KC_DB_POOL_MAX_SIZE
-        value: "2"
 
   - type: web
     name: adega-api
