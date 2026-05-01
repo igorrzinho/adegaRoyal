@@ -5,8 +5,14 @@ services:
     runtime: image
     image: 
       url: quay.io/keycloak/keycloak:26.6.1
-    startCommand: /opt/keycloak/bin/kc.sh start-dev
+    # Adicionado --http-port=8080 para forçar a porta correta
+    startCommand: /opt/keycloak/bin/kc.sh start-dev --http-port=8080
     envVars:
+      # Adicionadas as duas variáveis vitais para o Render não matar o processo
+      - key: PORT
+        value: "8080"
+      - key: KC_PROXY
+        value: edge
       - key: KC_DB
         value: postgres
       - key: KC_DB_URL
