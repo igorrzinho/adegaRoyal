@@ -6,8 +6,8 @@ services:
     name: adega-keycloak
     plan: free 
     runtime: docker
-    dockerImage: quay.io/keycloak/keycloak:latest
-    dockerCommand: start-dev 
+    image: quay.io/keycloak/keycloak:latest
+    command: start-dev 
     envVars:
       - key: KC_DB
         value: postgres
