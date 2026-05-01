@@ -5,7 +5,7 @@ services:
     runtime: image
     image: 
       url: quay.io/keycloak/keycloak:26.6.1
-    startCommand: start-dev 
+    startCommand: /opt/keycloak/bin/kc.sh start-dev
     envVars:
       - key: KC_DB
         value: postgres
