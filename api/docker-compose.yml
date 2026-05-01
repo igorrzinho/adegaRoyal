@@ -28,27 +28,45 @@ services:
       - -c
       - |
         set -e
-        echo "Verificando se o banco Keycloak já tem dados..."
-        apt-get update && apt-get install -y libicu-dev
-        
+
+        echo "Instalando dependências (curl, gnupg2, apt-transport-https, ca-certificates)..."
+        apt-get update && apt-get install -y curl gnupg2 apt-transport-https ca-certificates
+
+        echo "Configurando repositório do Microsoft SQL Tools..."
+        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft.gpg
+        echo "deb [signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list
+        apt-get update
+
+        echo "Instalando sqlcmd e libicu..."
+        ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev libicu-dev
+        export PATH="/opt/mssql-tools18/bin:/root/.dotnet/tools:$PATH"
+
         echo "Instalando SqlPackage..."
-        dotnet tool install --global Microsoft.SqlPackage
-        
-        export PATH="/root/.dotnet/tools:$$PATH"
-        
-        # Verificar se o banco Keycloak já tem tabelas
-        echo "Verificando se o banco Keycloak já tem dados..."
-        TABLE_COUNT=$(sqlcmd -S sqlserver -U sa -P 'Keycloak!123' -Q "USE Keycloak; SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE';" -h -1 2>/dev/null || echo "0")
-        
-        if [ "$TABLE_COUNT" -gt "0" ]; then
-          echo "Banco Keycloak já tem $TABLE_COUNT tabelas. Pulando importação."
-          exit 0
+        dotnet tool install --global Microsoft.SqlPackage || true
+
+        if ! command -v sqlpackage >/dev/null 2>&1; then
+          echo "Erro: sqlpackage não está disponível após a instalação."
+          ls -la /root/.dotnet/tools
+          exit 1
         fi
-        
+
+        echo "Verificando volume de backup..."
+        ls -la /container_backup
+
+        echo "Limpando o banco Keycloak para garantir importação limpa..."
+        # O -C é para confiar no certificado do server
+        sqlcmd -S sqlserver -U sa -P 'Keycloak!123' -C -Q "IF EXISTS (SELECT name FROM sys.databases WHERE name = 'Keycloak') DROP DATABASE [Keycloak];"
+
         echo "Iniciando importação do Keycloak.bacpac..."
-        sqlpackage /Action:Import /SourceFile:/container_backup/Keycloak.bacpac /TargetServerName:sqlserver /TargetDatabaseName:Keycloak /TargetUser:sa /TargetPassword:Keycloak!123 /TargetTrustServerCertificate:True
-        
-        echo "Importação do Keycloak.bacpac concluída!"
+        sqlpackage /Action:Import \
+          /SourceFile:/container_backup/Keycloak.bacpac \
+          /TargetServerName:sqlserver \
+          /TargetDatabaseName:Keycloak \
+          /TargetUser:sa \
+          /TargetPassword:Keycloak!123 \
+          /TargetTrustServerCertificate:True
+
+        echo "Importação concluída com sucesso!"
     networks:
       - adega-network
 
