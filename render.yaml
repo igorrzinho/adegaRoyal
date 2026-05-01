@@ -2,7 +2,7 @@ services:
   - type: web
     name: adega-keycloak
     plan: free 
-    runtime: docker
+    runtime: image
     image: 
       url: quay.io/keycloak/keycloak:26.6.1
     startCommand: start-dev 
