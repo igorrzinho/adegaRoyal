@@ -8,24 +8,25 @@ namespace KeycloakAuth.Services;
 public class KeycloakAdminService(HttpClient httpClient, IConfiguration config) : IKeycloakAdminService
 {
     private readonly string _baseUrl = config["Keycloak:BaseUrl"] ?? "http://localhost:8080";
-    private readonly string _realm = config["Keycloak:Realm"] ?? "auth-demo";
+    private readonly string _realm = config["Keycloak:Realm"] ?? "adega-royal";
 
     public async Task AddRoleToUserAsync(string userId, string roleName)
     {
-        try 
+        await SetAdminTokenAsync();
+        
+        // First, ensure the role exists
+        await EnsureRealmRoleExistsAsync(roleName);
+        
+        var url = $"{_baseUrl}/admin/realms/{_realm}/users/{userId}/role-mappings/realm";
+        var role = await GetRealmRoleAsync(roleName);
+        var content = new StringContent(JsonSerializer.Serialize(new[] { role }), Encoding.UTF8, "application/json");
+        var response = await httpClient.PostAsync(url, content);
+        
+        if (!response.IsSuccessStatusCode)
         {
-            await SetAdminTokenAsync();
-            var url = $"{_baseUrl}/admin/realms/{_realm}/users/{userId}/role-mappings/realm";
-            var role = await GetRealmRoleAsync(roleName);
-            var content = new StringContent(JsonSerializer.Serialize(new[] { role }), Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(url, content);
-            response.EnsureSuccessStatusCode();
-        } 
-        catch (HttpRequestException) 
-        {
-            // If the role doesn't exist in Keycloak, ignore the error and continue.
-            // This prevents the whole registration flow (and local DB sync) from failing.
-            // In a production app you might want to create the role on-the-fly here.
+            var error = await response.Content.ReadAsStringAsync();
+            throw new InvalidOperationException(
+                $"Failed to add role '{roleName}' to user '{userId}': {response.StatusCode} - {error}");
         }
     }
 
@@ -135,6 +136,12 @@ public class KeycloakAdminService(HttpClient httpClient, IConfiguration config) 
     {
         var url = $"{_baseUrl}/admin/realms/{_realm}/roles/{roleName}";
         var response = await httpClient.GetAsync(url);
+        
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+        {
+            throw new InvalidOperationException($"Role '{roleName}' not found in realm '{_realm}'");
+        }
+        
         response.EnsureSuccessStatusCode();
         var json = await response.Content.ReadAsStringAsync();
         return JsonDocument.Parse(json).RootElement.Clone();
@@ -208,5 +215,38 @@ public class KeycloakAdminService(HttpClient httpClient, IConfiguration config) 
 
         httpClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", tokenElement.GetString());
+    }
+
+    private async Task EnsureRealmRoleExistsAsync(string roleName)
+    {
+        try
+        {
+            await GetRealmRoleAsync(roleName);
+            // Role exists, no need to create
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            // Role doesn't exist, create it
+            var createRoleUrl = $"{_baseUrl}/admin/realms/{_realm}/roles";
+            var rolePayload = new
+            {
+                name = roleName,
+                description = $"{roleName} role for Adega Royal"
+            };
+
+            var content = new StringContent(
+                JsonSerializer.Serialize(rolePayload), 
+                Encoding.UTF8, 
+                "application/json");
+            
+            var response = await httpClient.PostAsync(createRoleUrl, content);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                throw new InvalidOperationException(
+                    $"Failed to create role '{roleName}': {response.StatusCode} - {error}");
+            }
+        }
     }
 }

@@ -1,91 +1,17 @@
 services:
-  sqlserver:
-    image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: adega-sqlserver
-    environment:
-      - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=Keycloak!123
-    ports:
-      - "1433:1433"
-    healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'Keycloak!123' -Q 'SELECT 1' -C"]
-      interval: 10s
-      timeout: 10s
-      retries: 15
-    networks:
-      - adega-network
-
-  import-tool:
-    image: mcr.microsoft.com/dotnet/sdk:10.0
-    container_name: adega-import-tool
-    volumes:
-      - ./Bacpac:/container_backup
-    depends_on:
-      sqlserver:
-        condition: service_healthy
-    entrypoint: /bin/bash
-    command:
-      - -c
-      - |
-        set -e
-
-        echo "Instalando dependências (curl, gnupg2, apt-transport-https, ca-certificates)..."
-        apt-get update && apt-get install -y curl gnupg2 apt-transport-https ca-certificates
-
-        echo "Configurando repositório do Microsoft SQL Tools..."
-        curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /usr/share/keyrings/microsoft.gpg
-        echo "deb [signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/mssql-release.list
-        apt-get update
-
-        echo "Instalando sqlcmd e libicu..."
-        ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev libicu-dev
-        export PATH="/opt/mssql-tools18/bin:/root/.dotnet/tools:$PATH"
-
-        echo "Instalando SqlPackage..."
-        dotnet tool install --global Microsoft.SqlPackage || true
-
-        if ! command -v sqlpackage >/dev/null 2>&1; then
-          echo "Erro: sqlpackage não está disponível após a instalação."
-          ls -la /root/.dotnet/tools
-          exit 1
-        fi
-
-        echo "Verificando volume de backup..."
-        ls -la /container_backup
-
-        echo "Limpando o banco Keycloak para garantir importação limpa..."
-        # O -C é para confiar no certificado do server
-        sqlcmd -S sqlserver -U sa -P 'Keycloak!123' -C -Q "IF EXISTS (SELECT name FROM sys.databases WHERE name = 'Keycloak') DROP DATABASE [Keycloak];"
-
-        echo "Iniciando importação do Keycloak.bacpac..."
-        sqlpackage /Action:Import \
-          /SourceFile:/container_backup/Keycloak.bacpac \
-          /TargetServerName:sqlserver \
-          /TargetDatabaseName:Keycloak \
-          /TargetUser:sa \
-          /TargetPassword:Keycloak!123 \
-          /TargetTrustServerCertificate:True
-
-        echo "Importação concluída com sucesso!"
-    networks:
-      - adega-network
-
   keycloak:
     image: quay.io/keycloak/keycloak:latest
     container_name: adega-keycloak
     command: start-dev
     environment:
-      - KC_DB=mssql
-      - KC_DB_URL=jdbc:sqlserver://sqlserver:1433;databaseName=Keycloak;encrypt=true;trustServerCertificate=true;
-      - KC_DB_USERNAME=sa
-      - KC_DB_PASSWORD=Keycloak!123
+      - KC_DB=postgres
+      - KC_DB_URL=jdbc:postgresql://ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech:5432/neondb?sslmode=require
+      - KC_DB_USERNAME=neondb_owner
+      - KC_DB_PASSWORD=npg_OwuCLEAoh9G5
       - KEYCLOAK_ADMIN=admin
       - KEYCLOAK_ADMIN_PASSWORD=admin
       - KC_HTTP_ENABLED=true
       - KC_HOSTNAME_STRICT=false
-    depends_on:
-      import-tool:
-        condition: service_completed_successfully
     ports:
       - "8080:8080"
     networks:
@@ -99,7 +25,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
-      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=AppTaskDb;User Id=sa;Password=Keycloak!123;TrustServerCertificate=True;
+      - ConnectionStrings__DefaultConnection=postgresql://neondb_owner:npg_OwuCLEAoh9G5@ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - Keycloak__BaseUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080
       - Keycloak__Realm=auth-demo
       - Keycloak__AdminUsername=admin
