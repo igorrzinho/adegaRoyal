@@ -4,29 +4,56 @@ services:
     plan: free 
     runtime: docker 
     dockerfilePath: ./keycloak.Dockerfile 
+
     envVars:
       - key: PORT
         value: "8080"
-      - key: KC_PROXY
+
+      - key: KC_HTTP_HOST
+        value: 0.0.0.0
+
+      - key: KC_PROXY_HEADERS
         value: xforwarded
+
       - key: KC_DB
         value: postgres
+
       - key: KC_DB_URL
         value: jdbc:postgresql://ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech:5432/neondb?sslmode=require
+
       - key: KC_DB_USERNAME
         value: neondb_owner
+
       - key: KC_DB_PASSWORD
         value: npg_OwuCLEAoh9G5
+
       - key: KEYCLOAK_ADMIN
         value: admin
+
       - key: KEYCLOAK_ADMIN_PASSWORD
         value: admin
+
       - key: KC_HTTP_ENABLED
         value: "true"
-      - key: KC_HOSTNAME_STRICT
-        value: "false"
+
       - key: KC_HOSTNAME
         value: adega-keycloak.onrender.com
+
+      - key: KC_HOSTNAME_STRICT
+        value: "false"
+
+      - key: KC_HOSTNAME_URL
+        value: https://adega-keycloak.onrender.com
+
+      - key: KC_HOSTNAME_ADMIN_URL
+        value: https://adega-keycloak.onrender.com
+
+      - key: KC_HOSTNAME_STRICT_HTTPS
+        value: "false"
+
+      - key: KC_HTTP_RELATIVE_PATH
+        value: /
+
       - key: JAVA_OPTS_APPEND
         value: "-Xms256m -Xmx512m"
 
