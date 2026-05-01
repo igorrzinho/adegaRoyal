@@ -1,14 +1,10 @@
 services:
   - type: web
-    name: adega-keycloak
+    name: adega-keycloak  
     plan: free 
-    runtime: image
-    image: 
-      url: quay.io/keycloak/keycloak:26.6.1
-    # Adicionado --http-port=8080 para forçar a porta correta
-    startCommand: /opt/keycloak/bin/kc.sh start-dev --http-port=8080
+    runtime: docker 
+    dockerfilePath: ./keycloak.Dockerfile 
     envVars:
-      # Adicionadas as duas variáveis vitais para o Render não matar o processo
       - key: PORT
         value: "8080"
       - key: KC_PROXY
@@ -32,7 +28,7 @@ services:
       - key: KC_HOSTNAME
         value: adega-keycloak.onrender.com
       - key: JAVA_OPTS_APPEND
-        value: "-Xms128m -Xmx256m"
+        value: "-Xms256m -Xmx512m"
       - key: KC_DB_POOL_MAX_SIZE
         value: "2"
 
