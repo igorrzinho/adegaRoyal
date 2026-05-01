@@ -1,6 +1,6 @@
 # Adega Royal API — Guia de Uso
 
-Base URL local: `http://localhost:5065`
+Base URL local: `http://localhost:5065/swagger/index.html`
 
 ---
 

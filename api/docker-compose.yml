@@ -1,7 +1,7 @@
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
-    container_name: keycloak-db
+    container_name: adega-sqlserver
     environment:
       - ACCEPT_EULA=Y
       - MSSQL_SA_PASSWORD=Keycloak!123
@@ -12,10 +12,12 @@ services:
       interval: 10s
       timeout: 10s
       retries: 15
+    networks:
+      - adega-network
 
   import-tool:
     image: mcr.microsoft.com/dotnet/sdk:10.0
-    container_name: import-tool
+    container_name: adega-import-tool
     volumes:
       - ./Bacpac:/container_backup
     depends_on:
@@ -38,15 +40,12 @@ services:
         sqlpackage /Action:Import /SourceFile:/container_backup/Keycloak.bacpac /TargetServerName:sqlserver /TargetDatabaseName:Keycloak /TargetUser:sa /TargetPassword:Keycloak!123 /TargetTrustServerCertificate:True
         
         echo "Importação do Keycloak.bacpac concluída!"
-        
-        echo "Iniciando importação do AppTaskDb.bacpac..."
-        sqlpackage /Action:Import /SourceFile:/container_backup/AppTaskDb.bacpac /TargetServerName:sqlserver /TargetDatabaseName:AppTaskDb /TargetUser:sa /TargetPassword:Keycloak!123 /TargetTrustServerCertificate:True
-        
-        echo "Importação do AppTaskDb.bacpac concluída!"
+    networks:
+      - adega-network
 
   keycloak:
     image: quay.io/keycloak/keycloak:latest
-    container_name: keycloak-server
+    container_name: adega-keycloak
     command: start-dev
     environment:
       - KC_DB=mssql
@@ -62,3 +61,36 @@ services:
         condition: service_completed_successfully
     ports:
       - "8080:8080"
+    networks:
+      - adega-network
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: adega-api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8000
+      - ConnectionStrings__DefaultConnection=Server=sqlserver,1433;Database=AppTaskDb;User Id=sa;Password=Keycloak!123;TrustServerCertificate=True;
+      - Keycloak__BaseUrl=http://keycloak:8080
+      - Keycloak__Realm=auth-demo
+      - Keycloak__AdminUsername=admin
+      - Keycloak__AdminPassword=admin
+      - Keycloak__PublicClientId=public-client
+      - Keycloak__AuthorizationUrl=http://keycloak:8080/realms/auth-demo/protocol/openid-connect/auth
+      - Keycloak__TokenUrl=http://keycloak:8080/realms/auth-demo/protocol/openid-connect/token
+      - Authentication__MetadataAddress=http://keycloak:8080/realms/auth-demo/.well-known/openid-configuration
+      - Authentication__ValidIssuer=http://keycloak:8080/realms/auth-demo
+      - Authentication__ClientId=public-client
+    ports:
+      - "8000:8000"
+    depends_on:
+      keycloak:
+        condition: service_started
+    networks:
+      - adega-network
+
+networks:
+  adega-network:
+    driver: bridge

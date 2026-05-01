@@ -134,12 +134,29 @@ builder.Services
 WebApplication app = builder.Build();
 
 // === AUTO-MIGRATION ===
-// Applies any pending EF Core migrations automatically on startup.
-// Ensures the database schema is always up to date without manual intervention.
+// Applies EF Core migrations only when the database is empty.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.MigrateAsync();
+    if (await db.Database.CanConnectAsync())
+    {
+        var connection = db.Database.GetDbConnection();
+        await connection.OpenAsync();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = @"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'";
+        var result = await command.ExecuteScalarAsync();
+        var tableCount = Convert.ToInt32(result);
+
+        if (tableCount == 0)
+        {
+            await db.Database.MigrateAsync();
+        }
+    }
+    else
+    {
+        await db.Database.MigrateAsync();
+    }
 }
 
 // === MIDDLEWARE ===
