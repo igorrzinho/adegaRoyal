@@ -17,7 +17,7 @@ builder.Services.AddSwaggerGenWithAuthSupport(builder.Configuration);
 
 // === DATABASE CONFIGURATION ===
 builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("Postgres")));
 
 // === CORS CONFIGURATION ===
 // Allow React Native emulator and mobile clients to connect
@@ -82,7 +82,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
         options.Authority = builder.Configuration["Authentication:ValidIssuer"]
-            ?? "http://localhost:8080/realms/auth-demo";
+            ?? "http://localhost:8080/realms/adega-royal";
         options.Audience = "account";
         options.RequireHttpsMetadata = false;
 

@@ -266,7 +266,7 @@ curl http://localhost:5065/health
 ```json
 "Keycloak": {
   "BaseUrl": "http://localhost:8080",
-  "Realm": "auth-demo",
+  "Realm": "adega-royal",
   "AdminUsername": "admin",
   "AdminPassword": "admin",
   "PublicClientId": "public-client"

@@ -1,0 +1,12 @@
+CREATE DATABASE "Keycloak";
+CREATE DATABASE "AdegaRoyal";
+
+-- API User
+CREATE USER admin WITH ENCRYPTED PASSWORD 'Admin@123!';
+GRANT ALL PRIVILEGES ON DATABASE "AdegaRoyal" TO admin;
+ALTER DATABASE "AdegaRoyal" OWNER TO admin;
+
+-- Keycloak User
+CREATE USER keycloak WITH ENCRYPTED PASSWORD 'Keycloak@123!';
+GRANT ALL PRIVILEGES ON DATABASE "Keycloak" TO keycloak;
+ALTER DATABASE "Keycloak" OWNER TO keycloak;

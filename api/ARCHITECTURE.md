@@ -116,7 +116,7 @@ Located in `Enums/OrderStatus.cs`:
 ### Authentication
 - **Provider**: Keycloak (OAuth 2.0 / OpenID Connect)
 - **Token Type**: JWT Bearer
-- **Authority**: `http://localhost:8080/realms/auth-demo`
+- **Authority**: `http://localhost:8080/realms/adega-royal`
 - **Audience**: `account`
 
 ### Authorization

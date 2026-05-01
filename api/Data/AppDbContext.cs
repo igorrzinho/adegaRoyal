@@ -56,7 +56,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .IsRequired();
 
             entity.Property(u => u.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.Property(u => u.IsActive)
                 .HasDefaultValue(true);
@@ -110,10 +110,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasDefaultValue(true);
 
             entity.Property(p => p.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.Property(p => p.UpdatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.HasOne(p => p.Category)
                 .WithMany(c => c.Products)
@@ -150,10 +150,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .HasDatabaseName("UX_Cart_UserId");
 
             entity.Property(c => c.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.Property(c => c.UpdatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
         });
 
         // =============================================
@@ -168,7 +168,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .IsRequired();
 
             entity.Property(ci => ci.AddedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.HasOne(ci => ci.Cart)
                 .WithMany(c => c.Items)
@@ -206,7 +206,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
             entity.Ignore(o => o.User);
 
             entity.Property(o => o.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.Property(o => o.TotalAmount)
                 .HasPrecision(18, 2)
@@ -244,7 +244,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .IsRequired();
 
             entity.Property(oi => oi.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             entity.HasOne(oi => oi.Order)
                 .WithMany(o => o.OrderItems)
@@ -281,7 +281,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
                 .IsFixedLength();
 
             entity.Property(d => d.CreatedAt)
-                .HasDefaultValueSql("GETUTCDATE()");
+                .HasDefaultValueSql("NOW()");
 
             // 1:1 relationship — one Delivery per Order
             entity.HasOne(d => d.Order)
