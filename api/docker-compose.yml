@@ -7,7 +7,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
-      - ConnectionStrings__DefaultConnection=postgresql://neondb_owner:npg_OwuCLEAoh9G5@ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - ConnectionStrings__DefaultConnection=Host=ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech;Database=neondb;Username=neondb_owner;Password=npg_OwuCLEAoh9G5;Ssl Mode=Require;Trust Server Certificate=true;
     ports:
       - "8000:8000"
     networks:
