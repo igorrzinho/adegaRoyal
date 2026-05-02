@@ -1,9 +1,9 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Services;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
 /// <summary>
 /// API endpoints for managing product categories.
@@ -41,7 +41,7 @@ public class CategoriesController(ICategoryService categoryService) : Controller
     /// Create a new category (Admin only).
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<CategoryDto>> CreateCategory([FromBody] CreateCategoryDto dto)
     {
         if (!ModelState.IsValid)
@@ -55,7 +55,7 @@ public class CategoriesController(ICategoryService categoryService) : Controller
     /// Update an existing category (Admin only).
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<CategoryDto>> UpdateCategory(Guid id, [FromBody] CreateCategoryDto dto)
     {
         if (!ModelState.IsValid)
@@ -72,7 +72,7 @@ public class CategoriesController(ICategoryService categoryService) : Controller
     /// Delete a category (Admin only).
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> DeleteCategory(Guid id)
     {
         var success = await categoryService.DeleteCategoryAsync(id);

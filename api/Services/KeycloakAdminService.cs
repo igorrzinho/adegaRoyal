@@ -1,9 +1,9 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using KeycloakAuth.DTOs;
+using AdegaRoyal.Api.DTOs;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 public class KeycloakAdminService(HttpClient httpClient, IConfiguration config) : IKeycloakAdminService
 {

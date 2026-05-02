@@ -1,7 +1,7 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Enums;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Enums;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Manages delivery records, OTP generation and verification.

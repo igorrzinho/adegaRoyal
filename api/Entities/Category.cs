@@ -1,4 +1,4 @@
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 /// <summary>
 /// Represents a product category (e.g., Red Wine, White Wine, Beer).

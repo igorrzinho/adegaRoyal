@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>
 /// Payload for partial checkout: customer selects which CartItem IDs to convert to an Order.

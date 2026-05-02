@@ -1,4 +1,4 @@
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 /// <summary>
 /// Represents a line item within an order (specific product and quantity).

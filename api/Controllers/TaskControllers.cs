@@ -1,14 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using KeycloakAuth.Filters;
-using KeycloakAuth.Services; 
+using AdegaRoyal.Api.Services;
 using System.Security.Claims;
-using KeycloakAuth.DTOs;
+using AdegaRoyal.Api.DTOs;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
-[ServiceFilter(typeof(SyncKeycloakUserFilter))]
 public class TasksController(ITaskService taskService) : ControllerBase
 {
     [HttpGet]

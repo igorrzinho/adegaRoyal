@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using KeycloakAuth.Entities;
+using AdegaRoyal.Api.Entities;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 public interface ITaskService
 {

@@ -1,10 +1,10 @@
-using KeycloakAuth.Data;
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Entities;
-using KeycloakAuth.Enums;
+using AdegaRoyal.Api.Data;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Entities;
+using AdegaRoyal.Api.Enums;
 using Microsoft.EntityFrameworkCore;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Order management service supporting partial checkout from cart items.

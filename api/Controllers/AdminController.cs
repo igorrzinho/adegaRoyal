@@ -1,58 +1,82 @@
+using AdegaRoyal.Api.Data;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Entities;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Services;
+using Microsoft.EntityFrameworkCore;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
+/// <summary>
+/// Admin-only endpoints for managing users and their claims.
+/// Requires the "Admin" role — use [Authorize(Policy = "AdminOnly")] at the class level.
+/// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "admin")]
-public class AdminController(IKeycloakAdminService adminService) : ControllerBase
+[Authorize(Policy = "AdminOnly")]
+public class AdminController(
+    AppDbContext context,
+    IUserService userService) : ControllerBase
 {
-    [HttpPost("users")]
-    public async Task<IActionResult> CreateUser([FromBody] CreateUserDto newUser)
+    // ── List all users ─────────────────────────────────────────────────────────
+
+    /// <summary>Returns every registered user. Admin only.</summary>
+    [HttpGet("users")]
+    [ProducesResponseType(typeof(IEnumerable<UserDto>), 200)]
+    public async Task<IActionResult> GetAllUsers()
     {
-        if (newUser is null)
-        {
-            return BadRequest(new { message = "Dados do usuário são obrigatórios." });
-        }
-
-        var role = newUser.Role?.Trim();
-        if (string.IsNullOrWhiteSpace(role) || !(role.Equals("admin", StringComparison.OrdinalIgnoreCase) || role.Equals("user", StringComparison.OrdinalIgnoreCase)))
-        {
-            return BadRequest(new { message = "Role deve ser 'admin' ou 'user'." });
-        }
-
-        var result = await adminService.CreateUserAsync(newUser);
-        return Created(result.Location, result);
+        var users = await userService.GetAllAsync();
+        return Ok(users);
     }
 
-    [HttpPost("users/{userId}/roles")]
-    public async Task<IActionResult> AssignRole(string userId, [FromBody] string roleName)
+    // ── Manage UserClaims ──────────────────────────────────────────────────────
+
+    /// <summary>Adds a custom claim to a user (e.g., "can_manage_products").</summary>
+    [HttpPost("users/{userId:guid}/claims")]
+    [ProducesResponseType(201)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> AddClaim(Guid userId, [FromBody] string claimValue)
     {
-        await adminService.AddRoleToUserAsync(userId, roleName);
-        return Ok(new { message = "Role adicionada" });
+        if (!await context.Users.AnyAsync(u => u.Id == userId))
+            return NotFound(new { message = "Usuário não encontrado." });
+
+        var claim = new UserClaim { UserId = userId, ClaimValue = claimValue };
+        context.UserClaims.Add(claim);
+        await context.SaveChangesAsync();
+
+        return Created($"/api/admin/users/{userId}/claims", new { id = claim.Id, claimValue });
     }
 
-    [HttpDelete("users/{userId}/roles/{roleName}")]
-    public async Task<IActionResult> RemoveRole(string userId, string roleName)
+    /// <summary>Removes a specific claim from a user.</summary>
+    [HttpDelete("users/{userId:guid}/claims/{claimId:guid}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> RemoveClaim(Guid userId, Guid claimId)
     {
-        await adminService.RemoveRoleFromUserAsync(userId, roleName);
-        return Ok(new { message = "Role removida" });
+        var claim = await context.UserClaims
+            .FirstOrDefaultAsync(c => c.Id == claimId && c.UserId == userId);
+
+        if (claim is null)
+            return NotFound(new { message = "Claim não encontrada." });
+
+        context.UserClaims.Remove(claim);
+        await context.SaveChangesAsync();
+
+        return NoContent();
     }
 
-    [HttpPost("users/{userId}/claims")]
-    public async Task<IActionResult> SetClaim(string userId, string key, string value)
+    /// <summary>Lists all claims of a user.</summary>
+    [HttpGet("users/{userId:guid}/claims")]
+    [ProducesResponseType(200)]
+    public async Task<IActionResult> GetClaims(Guid userId)
     {
-        await adminService.SetUserAttributeAsync(userId, key, value);
-        return Ok(new { message = "Atributo definido" });
-    }
+        var claims = await context.UserClaims
+            .AsNoTracking()
+            .Where(c => c.UserId == userId)
+            .Select(c => new { c.Id, c.ClaimValue })
+            .ToListAsync();
 
-    [HttpDelete("users/{userId}/claims/{key}")]
-    public async Task<IActionResult> RemoveClaim(string userId, string key)
-    {
-        await adminService.RemoveAttributeFromUserAsync(userId, key);
-        return Ok(new { message = "Atributo removido" });
+        return Ok(claims);
     }
 }

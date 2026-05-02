@@ -1,22 +1,4 @@
 services:
-  keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    container_name: adega-keycloak
-    command: start-dev
-    environment:
-      - KC_DB=postgres
-      - KC_DB_URL=jdbc:postgresql://ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech:5432/neondb?sslmode=require
-      - KC_DB_USERNAME=neondb_owner
-      - KC_DB_PASSWORD=npg_OwuCLEAoh9G5
-      - KEYCLOAK_ADMIN=admin
-      - KEYCLOAK_ADMIN_PASSWORD=admin
-      - KC_HTTP_ENABLED=true
-      - KC_HOSTNAME_STRICT=false
-    ports:
-      - "8080:8080"
-    networks:
-      - adega-network
-
   api:
     build:
       context: .
@@ -26,21 +8,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:8000
       - ConnectionStrings__DefaultConnection=postgresql://neondb_owner:npg_OwuCLEAoh9G5@ep-rapid-forest-ams8xemm-pooler.c-5.us-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
-      - Keycloak__BaseUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080
-      - Keycloak__Realm=auth-demo
-      - Keycloak__AdminUsername=admin
-      - Keycloak__AdminPassword=admin
-      - Keycloak__PublicClientId=public-client
-      - Keycloak__AuthorizationUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo/protocol/openid-connect/auth
-      - Keycloak__TokenUrl=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo/protocol/openid-connect/token
-      - Authentication__MetadataAddress=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo/.well-known/openid-configuration
-      - Authentication__ValidIssuer=https://crispy-chainsaw-jgppg5px4grh5xqr-8080.app.github.dev/realms/auth-demo
-      - Authentication__ClientId=public-client
     ports:
       - "8000:8000"
-    depends_on:
-      keycloak:
-        condition: service_started
     networks:
       - adega-network
 

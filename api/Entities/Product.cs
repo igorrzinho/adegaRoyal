@@ -1,4 +1,4 @@
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 /// <summary>
 /// Represents a product in the Adega Royal catalog (wine, spirits, beer, etc.).

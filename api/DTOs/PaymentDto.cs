@@ -1,4 +1,4 @@
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>Request payload sent to Abacate Pay for payment processing.</summary>
 public class PaymentRequestDto

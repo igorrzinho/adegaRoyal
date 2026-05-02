@@ -1,8 +1,8 @@
-using KeycloakAuth.Data;
-using KeycloakAuth.Entities;
+using AdegaRoyal.Api.Data;
+using AdegaRoyal.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Legacy task management service — kept for backward compatibility.

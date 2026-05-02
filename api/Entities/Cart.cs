@@ -1,4 +1,4 @@
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 /// <summary>
 /// Represents a shopping cart belonging to a single user.

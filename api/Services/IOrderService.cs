@@ -1,7 +1,7 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Enums;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Enums;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Manages order lifecycle including partial checkout from cart items.

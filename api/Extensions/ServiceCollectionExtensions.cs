@@ -1,41 +1,39 @@
+using AdegaRoyal.Api.Filters;
 using Microsoft.OpenApi;
 
-namespace KeycloakAuth.Extensions;
+namespace AdegaRoyal.Api.Extensions;
 
 internal static class ServiceCollectionExtensions
 {
-    internal static IServiceCollection AddSwaggerGenWithAuthSupport(this IServiceCollection services,
-    IConfiguration configuration)
+    internal static IServiceCollection AddSwaggerGenWithAuthSupport(
+        this IServiceCollection services,
+        IConfiguration configuration)
     {
         services.AddSwaggerGen(o =>
         {
-            o.CustomSchemaIds(id => id.FullName);
-            o.AddSecurityDefinition("Keycloak", new OpenApiSecurityScheme
+            o.SwaggerDoc("v1", new OpenApiInfo { Title = "Adega Royal API", Version = "v1" });
+
+            o.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
-                Type = SecuritySchemeType.OAuth2,
-                Flows = new OpenApiOAuthFlows
-                {
-                    AuthorizationCode = new OpenApiOAuthFlow
-                    {
-                        AuthorizationUrl = new Uri(configuration["Keycloak:AuthorizationUrl"]!),
-                        TokenUrl = new Uri(configuration["Keycloak:TokenUrl"]!),
-                        Scopes = new Dictionary<string, string>
-                        {
-                            { "openid", "openid" },
-                            { "profile", "profile" }
-                        }
-                    }
-                }
+                Name         = "Authorization",
+                Type         = SecuritySchemeType.Http,
+                Scheme       = "Bearer",
+                BearerFormat = "JWT",
+                In           = ParameterLocation.Header,
+                Description  = "Informe o JWT obtido em /api/auth/login.\nExemplo: Bearer eyJhbGci..."
             });
-            o.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
+
+            o.AddSecurityRequirement(_ => new OpenApiSecurityRequirement
             {
                 {
-                    new OpenApiSecuritySchemeReference("Keycloak",doc),
-                    []
+                    new OpenApiSecuritySchemeReference("Bearer"),
+                    new List<string>()
                 }
             });
+
+            o.OperationFilter<AuthorizeCheckOperationFilter>();
         });
+
         return services;
     }
-
 }

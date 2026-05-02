@@ -1,11 +1,11 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Enums;
-using KeycloakAuth.Services;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Enums;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
 /// <summary>
 /// Manages delivery records and OTP-based delivery confirmation.
@@ -26,7 +26,7 @@ public class DeliveriesController(IDeliveryService deliveryService) : Controller
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetDeliveryByOrderId(Guid orderId)
     {
-        if (User.IsInRole("admin"))
+        if (User.IsInRole("Admin"))
         {
             var adminDto = await deliveryService.GetDeliveryByOrderIdAdminAsync(orderId);
             return adminDto == null ? NotFound() : Ok(adminDto);
@@ -41,7 +41,7 @@ public class DeliveriesController(IDeliveryService deliveryService) : Controller
     /// Admin only — typically called automatically after checkout.
     /// </summary>
     [HttpPost("order/{orderId:guid}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(DeliveryAdminDto), 201)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -63,7 +63,7 @@ public class DeliveriesController(IDeliveryService deliveryService) : Controller
     /// Admin only.
     /// </summary>
     [HttpPatch("order/{orderId:guid}/status")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(DeliveryDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]
@@ -81,7 +81,7 @@ public class DeliveriesController(IDeliveryService deliveryService) : Controller
     /// If the code matches, marks the delivery and the associated order as Delivered.
     /// </summary>
     [HttpPost("order/{orderId:guid}/verify")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]

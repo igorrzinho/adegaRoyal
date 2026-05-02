@@ -1,7 +1,7 @@
-using KeycloakAuth.DTOs;
+using AdegaRoyal.Api.DTOs;
 using Microsoft.Extensions.Logging;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Simulated Abacate Pay integration.

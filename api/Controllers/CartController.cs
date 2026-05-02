@@ -1,10 +1,10 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Services;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
 /// <summary>
 /// Manages the shopping cart for the currently authenticated user.
