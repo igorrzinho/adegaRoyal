@@ -1,6 +1,6 @@
-using KeycloakAuth.Enums;
+using AdegaRoyal.Api.Enums;
 
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 /// <summary>
 /// Represents a delivery record tied to a specific order.

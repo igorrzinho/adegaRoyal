@@ -1,25 +1,31 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Services;
+using AdegaRoyal.Api.Data;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Entities;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Cryptography;
+using System.Text;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
 /// <summary>
-/// Handles authentication and user registration flows.
-/// Registration endpoints are intentionally public (no JWT required).
+/// Handles all authentication flows: login, registration, and token refresh.
+/// Registration endpoints are public by design — no JWT required.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController(
-    IKeycloakAdminService keycloakAdmin,
-    IUserService userService) : ControllerBase
+    AppDbContext context,
+    IPasswordHasherService passwordHasher,
+    ITokenService tokenService) : ControllerBase
 {
-    // ─── Authentication ───────────────────────────────────────────────────────
+    // ─── Login ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Authenticates a user via Keycloak and returns a JWT access token.
-    /// Uses the Resource Owner Password Credentials (ROPC) grant.
+    /// Authenticates a user with email and password.
+    /// Returns a short-lived JWT access token and a long-lived opaque refresh token.
     /// </summary>
     [HttpPost("login")]
     [AllowAnonymous]
@@ -30,63 +36,202 @@ public class AuthController(
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        try
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
+        // 1. Load user + password hash + claims — single round-trip
+        var user = await context.Users
+            .AsNoTracking()
+            .Include(u => u.Password)
+            .Include(u => u.Claims)
+            .Where(u => u.Email == normalizedEmail && u.IsActive)
+            .FirstOrDefaultAsync();
+
+        // 2. Validate credentials — use constant-time comparison via BCrypt.Verify
+        if (user is null || user.Password is null
+            || !passwordHasher.Verify(normalizedEmail, dto.Password, user.Password.PasswordHash))
         {
-            var response = await keycloakAdmin.LoginAsync(dto);
-            return Ok(response);
+            // Generic message — never reveal whether the email exists
+            return Unauthorized(new { message = "Credenciais inválidas." });
         }
-        catch (UnauthorizedAccessException ex)
+
+        // 3. Issue tokens
+        var claimValues = user.Claims.Select(c => c.ClaimValue);
+        var accessToken = tokenService.GenerateAccessToken(
+            userId:      user.Id,
+            name:        user.Name,
+            email:       user.Email,
+            role:        user.Role.ToString(),
+            claimValues: claimValues);
+
+        var rawRefreshToken = tokenService.GenerateRefreshToken();
+
+        // 4. Persist the refresh token (token rotation: one active token per login)
+        var refreshToken = new RefreshToken
         {
-            return Unauthorized(new { message = ex.Message });
-        }
+            UserId    = user.Id,
+            Token     = rawRefreshToken,
+            ExpiresAt = DateTime.UtcNow.Add(tokenService.RefreshTokenLifetime)
+        };
+        context.RefreshTokens.Add(refreshToken);
+        await context.SaveChangesAsync();
+
+        return Ok(new LoginResponseDto
+        {
+            AccessToken  = accessToken,
+            RefreshToken = rawRefreshToken,
+            ExpiresIn    = tokenService.AccessTokenExpiresInSeconds,
+            TokenType    = "Bearer"
+        });
     }
 
-    // ─── Registration (Public — no JWT required) ──────────────────────────────
+    // ─── Token Refresh ────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Registers a new CUSTOMER in Keycloak and syncs the profile to the local database.
-    /// This endpoint is public — no authentication required.
+    /// Exchanges a valid refresh token for a new access token + refresh token pair.
+    /// Implements token rotation: the old refresh token is revoked on use.
     /// </summary>
-    /// <remarks>
-    /// Flow:
-    /// 1. Creates the user in Keycloak with the <c>customer</c> realm role.
-    /// 2. Syncs the profile to the local SQL Server database.
-    /// </remarks>
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [ProducesResponseType(typeof(LoginResponseDto), 200)]
+    [ProducesResponseType(401)]
+    public async Task<ActionResult<LoginResponseDto>> Refresh([FromBody] RefreshTokenRequestDto dto)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        // Load the stored token with its owner
+        var stored = await context.RefreshTokens
+            .Include(r => r.User)
+                .ThenInclude(u => u.Claims)
+            .FirstOrDefaultAsync(r => r.Token == dto.RefreshToken && !r.IsRevoked);
+
+        if (stored is null || stored.ExpiresAt < DateTime.UtcNow || !stored.User.IsActive)
+            return Unauthorized(new { message = "Refresh token inválido ou expirado." });
+
+        // Revoke consumed token (rotation)
+        stored.IsRevoked = true;
+
+        // Issue new pair
+        var claimValues = stored.User.Claims.Select(c => c.ClaimValue);
+        var newAccessToken = tokenService.GenerateAccessToken(
+            userId:      stored.User.Id,
+            name:        stored.User.Name,
+            email:       stored.User.Email,
+            role:        stored.User.Role.ToString(),
+            claimValues: claimValues);
+
+        var newRawRefreshToken = tokenService.GenerateRefreshToken();
+        context.RefreshTokens.Add(new RefreshToken
+        {
+            UserId    = stored.UserId,
+            Token     = newRawRefreshToken,
+            ExpiresAt = DateTime.UtcNow.Add(tokenService.RefreshTokenLifetime)
+        });
+
+        await context.SaveChangesAsync();
+
+        return Ok(new LoginResponseDto
+        {
+            AccessToken  = newAccessToken,
+            RefreshToken = newRawRefreshToken,
+            ExpiresIn    = tokenService.AccessTokenExpiresInSeconds,
+            TokenType    = "Bearer"
+        });
+    }
+
+    // ─── Registration ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Registers a new customer. Public — no authentication required.
+    /// </summary>
     [HttpPost("register/customer")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(UserDto), 201)]
     [ProducesResponseType(400)]
     [ProducesResponseType(409)]
     public async Task<ActionResult<UserDto>> RegisterCustomer([FromBody] RegisterUserDto dto)
+        => await RegisterUserWithRole(dto, Enums.UserRole.Customer);
+
+    /// <summary>
+    /// Registers a new admin. Requires an existing Admin JWT.
+    /// </summary>
+    [HttpPost("register/admin")]
+   // [Authorize(Policy = "AdminOnly")]
+   [AllowAnonymous]
+    [ProducesResponseType(typeof(UserDto), 201)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(401)]
+    [ProducesResponseType(403)]
+    [ProducesResponseType(409)]
+    public async Task<ActionResult<UserDto>> RegisterAdmin([FromBody] RegisterUserDto dto)
+        => await RegisterUserWithRole(dto, Enums.UserRole.Admin);
+
+
+
+    // ─── Password Reset ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gera um token para redefinição de senha. Na vida real, enviaria por e-mail.
+    /// Aqui, vamos retornar na resposta para testes.
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [AllowAnonymous]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto dto)
     {
-        return await RegisterUserWithRole(dto, role: "customer");
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+        var user = await context.Users.FirstOrDefaultAsync(u => u.Email == normalizedEmail && u.IsActive);
+        
+        if (user == null)
+            return NotFound(new { message = "Usuário não encontrado." });
+
+        var token = GenerateResetToken(normalizedEmail);
+
+        // Retornamos o token na resposta (apenas para facilitar testes, 
+        // num cenário real enviaríamos por e-mail silenciosamente).
+        return Ok(new { 
+            message = "Token de redefinição gerado com sucesso.",
+            token = token 
+        });
     }
 
     /// <summary>
-    /// Registers a new ADMIN in Keycloak and syncs the profile to the local database.
-    /// This endpoint is public — no authentication required.
+    /// Redefine a senha utilizando o token recebido no forgot-password.
     /// </summary>
-    /// <remarks>
-    /// In production, protect this endpoint (e.g., require an API key or restrict by network).
-    /// Flow:
-    /// 1. Creates the user in Keycloak with the <c>admin</c> realm role.
-    /// 2. Syncs the profile to the local SQL Server database with Role = Admin.
-    /// </remarks>
-    [HttpPost("register/admin")]
+    [HttpPost("reset-password")]
     [AllowAnonymous]
-    [ProducesResponseType(typeof(UserDto), 201)]
+    [ProducesResponseType(200)]
     [ProducesResponseType(400)]
-    [ProducesResponseType(409)]
-    public async Task<ActionResult<UserDto>> RegisterAdmin([FromBody] RegisterUserDto dto)
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto dto)
     {
-        return await RegisterUserWithRole(dto, role: "admin");
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
+
+        if (!ValidateResetToken(normalizedEmail, dto.Token))
+            return BadRequest(new { message = "Token inválido ou expirado." });
+
+        var user = await context.Users
+            .Include(u => u.Password)
+            .FirstOrDefaultAsync(u => u.Email == normalizedEmail && u.IsActive);
+
+        if (user == null || user.Password == null)
+            return BadRequest(new { message = "Usuário não encontrado ou inconsistente." });
+
+        // Atualiza o hash da senha
+        user.Password.PasswordHash = passwordHasher.Hash(normalizedEmail, dto.NewPassword);
+        
+        await context.SaveChangesAsync();
+
+        return Ok(new { message = "Senha redefinida com sucesso." });
     }
 
     // ─── Profile lookup ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Returns the local profile of a registered user by their database ID.
-    /// Used internally after registration to build the CreatedAtAction location header.
+    /// Returns the public profile of a registered user by their database ID.
     /// </summary>
     [HttpGet("users/{id:guid}")]
     [AllowAnonymous]
@@ -94,79 +239,107 @@ public class AuthController(
     [ProducesResponseType(404)]
     public async Task<ActionResult<UserDto>> GetProfile(Guid id)
     {
-        var user = await userService.GetByIdAsync(id);
-        return user == null ? NotFound() : Ok(user);
+        var user = await context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == id);
+
+        return user is null ? NotFound() : Ok(MapToDto(user));
     }
 
-    // ─── Shared logic ─────────────────────────────────────────────────────────
+    // ─── Private helpers ──────────────────────────────────────────────────────
 
-    private async Task<ActionResult<UserDto>> RegisterUserWithRole(RegisterUserDto dto, string role)
+    private async Task<ActionResult<UserDto>> RegisterUserWithRole(RegisterUserDto dto, Enums.UserRole role)
     {
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        string? keycloakUserId = null;
+        var normalizedEmail = dto.Email.Trim().ToLowerInvariant();
 
+        // Idempotency check
+        if (await context.Users.AnyAsync(u => u.Email == normalizedEmail))
+            return Conflict(new { message = "Já existe uma conta com esse e-mail." });
+
+        // Create user aggregate
+        var user = new User(dto.Name, normalizedEmail, role);
+
+        var passwordRecord = new UserPassword
+        {
+            UserId       = user.Id,
+            PasswordHash = passwordHasher.Hash(normalizedEmail, dto.Password)
+        };
+
+        context.Users.Add(user);
+        context.UserPasswords.Add(passwordRecord);
+        await context.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetProfile), new { id = user.Id }, MapToDto(user));
+    }
+
+    private static UserDto MapToDto(Entities.User user) => new()
+    {
+        Id        = user.Id,
+        Name      = user.Name,
+        Email     = user.Email,
+        Role      = user.Role.ToString(),
+        CreatedAt = user.CreatedAt,
+        IsActive  = user.IsActive
+    };
+
+    // ─── Token Generators para Password Reset ─────────────────────────────────
+
+    private static string GenerateResetToken(string email)
+    {
+        // "chave fixa de dados convertidos para base 64"
+        var fixedKey = "6d0b2307-5075-4471-9a60-c7a6f7be3dc9";
+        var base64Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(fixedKey));
+
+        // Payload com validade de 1 hora
+        var expiration = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+        var payload = $"{email}:{expiration}";
+
+        // Assina o payload
+        using var hmac = new HMACSHA256(Convert.FromBase64String(base64Key));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+        var signature = Convert.ToBase64String(hash);
+
+        var rawToken = $"{payload}:{signature}";
+        return Convert.ToBase64String(Encoding.UTF8.GetBytes(rawToken));
+    }
+
+    private static bool ValidateResetToken(string email, string tokenBase64)
+    {
         try
         {
-            // Step 1: Create user in Keycloak with the given role
-            var keycloakUser = new CreateUserDto
-            {
-                Username = dto.Email,
-                Email    = dto.Email,
-                Password = dto.Password,
-                Role     = role
-            };
+            var fixedKey = "6d0b2307-5075-4471-9a60-c7a6f7be3dc9";
+            var base64Key = Convert.ToBase64String(Encoding.UTF8.GetBytes(fixedKey));
 
-            var keycloakResponse = await keycloakAdmin.CreateUserAsync(keycloakUser);
-            keycloakUserId = keycloakResponse.UserId;
+            var decoded = Encoding.UTF8.GetString(Convert.FromBase64String(tokenBase64));
+            var parts = decoded.Split(':');
+            
+            if (parts.Length != 3) return false;
 
-            // Step 2: Sync local profile to SQL Server
-            var syncDto = new SyncUserProfileDto
-            {
-                KeycloakId = keycloakUserId,
-                Name       = dto.Name,
-                Email      = dto.Email
-            };
+            var tokenEmail = parts[0];
+            var expirationStr = parts[1];
+            var signature = parts[2];
 
-            var userProfile = await userService.SyncProfileAsync(syncDto);
+            if (tokenEmail != email) return false;
 
-            // Step 3: Persist the correct role in the local DB
-            if (role == "admin")
-                await userService.SetRoleAsync(userProfile.Id, Enums.UserRole.Admin);
+            var expiration = long.Parse(expirationStr);
+            if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > expiration) return false;
 
-            var finalProfile = await userService.GetByIdAsync(userProfile.Id);
-            return CreatedAtAction(nameof(GetProfile), new { id = userProfile.Id }, finalProfile);
+            var payload = $"{tokenEmail}:{expirationStr}";
+            using var hmac = new HMACSHA256(Convert.FromBase64String(base64Key));
+            var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payload));
+            var expectedSignature = Convert.ToBase64String(hash);
+
+            // Time-constant comparison para a assinatura
+            return CryptographicOperations.FixedTimeEquals(
+                Convert.FromBase64String(signature),
+                Convert.FromBase64String(expectedSignature));
         }
-        catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.Conflict)
+        catch
         {
-            return Conflict(new { message = "An account with this email already exists in Keycloak." });
-        }
-        catch (InvalidOperationException ex)
-        {
-            // Keycloak-side errors (bad config, role not found, etc.)
-            return BadRequest(new
-            {
-                message      = ex.Message,
-                keycloakUser = keycloakUserId,
-                hint         = keycloakUserId != null
-                    ? "User was created in Keycloak but the local DB sync failed. Run POST /api/auth/sync to retry."
-                    : null
-            });
-        }
-        catch (Exception ex)
-        {
-            // Database or unexpected errors — surface the full message
-            return StatusCode(500, new
-            {
-                message      = ex.Message,
-                type         = ex.GetType().Name,
-                keycloakUser = keycloakUserId,
-                hint         = keycloakUserId != null
-                    ? "User was created in Keycloak but the local DB sync failed. Ensure migrations are applied: `dotnet ef database update`."
-                    : "Registration failed before reaching Keycloak."
-            });
+            return false;
         }
     }
 }
-

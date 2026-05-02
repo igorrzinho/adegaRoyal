@@ -1,4 +1,4 @@
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>
 /// Request DTO for creating a new Product.

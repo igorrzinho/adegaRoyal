@@ -1,6 +1,6 @@
-using KeycloakAuth.Enums;
+using AdegaRoyal.Api.Enums;
 
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 /// <summary>
 /// Represents a customer order in the Adega Royal system.

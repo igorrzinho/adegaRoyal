@@ -1,140 +1,90 @@
-using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using KeycloakAuth.Extensions;
-using KeycloakAuth.Data;
+using Microsoft.IdentityModel.Tokens;
+using AdegaRoyal.Api.Data;
+using AdegaRoyal.Api.Extensions;
+using AdegaRoyal.Api.Services;
 using Microsoft.EntityFrameworkCore;
-using KeycloakAuth.Filters;
-using KeycloakAuth.Services;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGenWithAuthSupport(builder.Configuration);
 
-// === DATABASE CONFIGURATION ===
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// === CORS CONFIGURATION ===
-// Allow React Native emulator and mobile clients to connect
+
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", corsPolicyBuilder =>
-    {
-        corsPolicyBuilder
-            .AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
+    options.AddPolicy("AllowAll", policy =>
+        policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader());
 });
 
-// === CONTROLLERS AND JSON SERIALIZATION ===
-builder.Services.AddControllers(options => 
+
+builder.Services
+    .AddControllers(options =>
     {
-        // Apply user sync globally on all requests
-        options.Filters.Add<SyncKeycloakUserFilter>();
+        options.Filters.Add(new Microsoft.AspNetCore.Mvc.Authorization.AuthorizeFilter());
     })
     .AddJsonOptions(options =>
     {
-        // Prevent JSON Object Cycle errors
-        options.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-        // Use camelCase for React Native/JavaScript compatibility
+        options.JsonSerializerOptions.ReferenceHandler     = ReferenceHandler.IgnoreCycles;
         options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-        // Serialize enums as strings
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
-// === DEPENDENCY INJECTION ===
 
-// Auth & User Management
-builder.Services.AddScoped<SyncKeycloakUserFilter>();
+builder.Services.AddSingleton<IPasswordHasherService, PasswordHasherService>();
+builder.Services.AddSingleton<ITokenService, TokenService>();
+
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddHttpClient<IKeycloakAdminService, KeycloakAdminService>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["Keycloak:BaseUrl"] ?? "http://localhost:8080");
-});
-// NOTE: Do not register KeycloakAdminService as Scoped separately when using AddHttpClient<TInterface, TImpl>
-// The HttpClient factory handles the lifetime automatically.
-
-// Catalog
 builder.Services.AddScoped<ICategoryService, CategoryService>();
 builder.Services.AddScoped<IProductService, ProductService>();
-
-// Shopping Cart
 builder.Services.AddScoped<ICartService, CartService>();
-
-// Orders & Checkout
 builder.Services.AddScoped<IOrderService, OrderService>();
-
-// Payment Gateway (Abacate Pay)
 builder.Services.AddScoped<IPaymentService, AbacatePayService>();
-
-// Delivery & OTP
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
 
-// === AUTHENTICATION AND AUTHORIZATION ===
-builder.Services.AddAuthorization();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+
+var jwtSection = builder.Configuration.GetSection("Jwt");
+var secretKey  = jwtSection["SecretKey"]
+    ?? throw new InvalidOperationException("Jwt:SecretKey is missing from configuration.");
+
+builder.Services
+    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = builder.Configuration["Authentication:ValidIssuer"]
-            ?? "http://localhost:8080/realms/auth-demo";
-        options.Audience = "account";
-        options.RequireHttpsMetadata = false;
-
-        // Map Keycloak realm roles from the JWT 'realm_access.roles' claim
-        options.Events = new JwtBearerEvents
+        options.RequireHttpsMetadata = false; 
+        options.TokenValidationParameters = new TokenValidationParameters
         {
-            OnTokenValidated = context =>
-            {
-                var claimsIdentity = context.Principal?.Identity as System.Security.Claims.ClaimsIdentity;
-                if (claimsIdentity == null) return Task.CompletedTask;
-
-                // Keycloak stores realm roles under realm_access.roles
-                var realmAccess = context.Principal?.FindFirstValue("realm_access");
-                if (realmAccess != null)
-                {
-                    try
-                    {
-                        var doc = JsonDocument.Parse(realmAccess);
-                        if (doc.RootElement.TryGetProperty("roles", out var roles))
-                        {
-                            foreach (var role in roles.EnumerateArray())
-                            {
-                                var roleValue = role.GetString();
-                                if (!string.IsNullOrEmpty(roleValue))
-                                    claimsIdentity.AddClaim(new Claim(ClaimTypes.Role, roleValue));
-                            }
-                        }
-                    }
-                    catch (JsonException) { /* Ignore malformed claims */ }
-                }
-
-                return Task.CompletedTask;
-            }
+            ValidateIssuer           = true,
+            ValidIssuer              = jwtSection["Issuer"] ?? "AdegaRoyal",
+            ValidateAudience         = true,
+            ValidAudience            = jwtSection["Audience"] ?? "AdegaRoyalClient",
+            ValidateLifetime         = true,
+            ClockSkew                = TimeSpan.Zero,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey         = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+            NameClaimType            = "name",
+            RoleClaimType            = "role"
         };
     });
 
-// === TELEMETRY ===
-builder.Services
-    .AddOpenTelemetry()
-    .ConfigureResource(resource => resource.AddService("AdegaRoyal"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation();
-    });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => 
+        policy.RequireClaim("role", "Admin"));
+        
+    options.AddPolicy("CustomerOnly", policy => 
+        policy.RequireClaim("role", "Customer"));
+});
 
-// === BUILD APPLICATION ===
 WebApplication app = builder.Build();
 
-// === AUTO-MIGRATION ===
-// Applies EF Core migrations only when the database is empty.
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -145,13 +95,11 @@ using (var scope = app.Services.CreateScope())
 
         using var command = connection.CreateCommand();
         command.CommandText = @"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'";
-        var result = await command.ExecuteScalarAsync();
+        var result     = await command.ExecuteScalarAsync();
         var tableCount = Convert.ToInt32(result);
 
         if (tableCount == 0)
-        {
             await db.Database.MigrateAsync();
-        }
     }
     else
     {
@@ -159,7 +107,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// === MIDDLEWARE ===
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -170,16 +117,5 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
-
-
-// === DIAGNOSTIC ENDPOINTS ===
-app.MapGet("/users/me", (ClaimsPrincipal claimsPrincipal) =>
-{
-    return claimsPrincipal.Claims.ToDictionary(c => c.Type, c => c.Value);
-})
-.RequireAuthorization();
-
-app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "AdegaRoyal", timestamp = DateTime.UtcNow }))
-    .WithName("HealthCheck");
 
 app.Run();

@@ -1,4 +1,4 @@
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>
 /// Response DTO for Product data (prevents circular references).

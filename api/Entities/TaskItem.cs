@@ -2,7 +2,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.Design;
 
-namespace KeycloakAuth.Entities;
+namespace AdegaRoyal.Api.Entities;
 
 public class TaskItem	
 {

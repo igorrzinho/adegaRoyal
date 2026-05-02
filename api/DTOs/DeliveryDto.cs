@@ -1,4 +1,4 @@
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>Represents a delivery record for an order.</summary>
 public class DeliveryDto

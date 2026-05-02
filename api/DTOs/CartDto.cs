@@ -1,4 +1,4 @@
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>Represents a shopping cart with its items.</summary>
 public class CartDto

@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AdegaRoyal.Api.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    [Migration("20260501194728_PostgresInitial")]
-    partial class PostgresInitial
+    [Migration("20260502215740_RemoveKeycloak")]
+    partial class RemoveKeycloak
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -236,6 +236,39 @@ namespace AdegaRoyal.Api.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.RefreshToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Token")
+                        .IsUnique()
+                        .HasDatabaseName("UX_RefreshToken_Token");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("RefreshTokens");
+                });
+
             modelBuilder.Entity("AdegaRoyal.Api.Entities.User", b =>
                 {
                     b.Property<Guid>("Id")
@@ -254,11 +287,6 @@ namespace AdegaRoyal.Api.Migrations
                         .HasColumnType("boolean")
                         .HasDefaultValue(true);
 
-                    b.Property<string>("KeycloakId")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -275,11 +303,49 @@ namespace AdegaRoyal.Api.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_User_Email");
 
-                    b.HasIndex("KeycloakId")
-                        .IsUnique()
-                        .HasDatabaseName("UX_User_KeycloakId");
-
                     b.ToTable("Users");
+                });
+
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.UserClaim", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ClaimValue")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("UserClaims");
+                });
+
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.UserPassword", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_UserPassword_UserId");
+
+                    b.ToTable("UserPasswords");
                 });
 
             modelBuilder.Entity("AdegaRoyal.Api.Entities.CartItem", b =>
@@ -342,6 +408,39 @@ namespace AdegaRoyal.Api.Migrations
                     b.Navigation("Category");
                 });
 
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.RefreshToken", b =>
+                {
+                    b.HasOne("AdegaRoyal.Api.Entities.User", "User")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.UserClaim", b =>
+                {
+                    b.HasOne("AdegaRoyal.Api.Entities.User", "User")
+                        .WithMany("Claims")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.UserPassword", b =>
+                {
+                    b.HasOne("AdegaRoyal.Api.Entities.User", "User")
+                        .WithOne("Password")
+                        .HasForeignKey("AdegaRoyal.Api.Entities.UserPassword", "UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("AdegaRoyal.Api.Entities.Cart", b =>
                 {
                     b.Navigation("Items");
@@ -364,6 +463,15 @@ namespace AdegaRoyal.Api.Migrations
                     b.Navigation("CartItems");
 
                     b.Navigation("OrderItems");
+                });
+
+            modelBuilder.Entity("AdegaRoyal.Api.Entities.User", b =>
+                {
+                    b.Navigation("Claims");
+
+                    b.Navigation("Password");
+
+                    b.Navigation("RefreshTokens");
                 });
 #pragma warning restore 612, 618
         }

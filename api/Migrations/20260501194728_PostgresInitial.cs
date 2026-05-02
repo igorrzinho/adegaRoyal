@@ -1,9 +1,9 @@
-﻿using System;
+using System;
 using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace KeycloakAuth.Migrations
+namespace AdegaRoyal.Api.Migrations
 {
     /// <inheritdoc />
     public partial class PostgresInitial : Migration

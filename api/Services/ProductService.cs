@@ -1,9 +1,9 @@
-using KeycloakAuth.Data;
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Entities;
+using AdegaRoyal.Api.Data;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Entities;
 using Microsoft.EntityFrameworkCore;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Service implementation for managing products using primary constructor.

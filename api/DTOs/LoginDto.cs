@@ -1,6 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 /// <summary>Payload for authenticating a user via Keycloak (returns JWT).</summary>
 public class LoginRequestDto

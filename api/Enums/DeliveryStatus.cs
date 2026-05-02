@@ -1,4 +1,4 @@
-namespace KeycloakAuth.Enums;
+namespace AdegaRoyal.Api.Enums;
 
 /// <summary>
 /// Represents the lifecycle status of a delivery in the Adega Royal system.

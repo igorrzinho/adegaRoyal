@@ -1,11 +1,11 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Enums;
-using KeycloakAuth.Services;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Enums;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
 /// <summary>
 /// Manages the order lifecycle.
@@ -45,7 +45,7 @@ public class OrdersController(
 
         // Admins can see any order
         OrderDto? order;
-        if (User.IsInRole("admin"))
+        if (User.IsInRole("Admin"))
             order = await orderService.GetOrderByIdAdminAsync(id);
         else
             order = await orderService.GetOrderByIdAsync(id, userId);
@@ -133,7 +133,7 @@ public class OrdersController(
 
     /// <summary>Returns all orders in the system (admin only).</summary>
     [HttpGet("admin/all")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(IEnumerable<OrderDto>), 200)]
     public async Task<ActionResult<IEnumerable<OrderDto>>> GetAllOrders()
     {
@@ -143,7 +143,7 @@ public class OrdersController(
 
     /// <summary>Updates the status of any order (admin only).</summary>
     [HttpPatch("{id:guid}/status")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(OrderDto), 200)]
     [ProducesResponseType(400)]
     [ProducesResponseType(404)]

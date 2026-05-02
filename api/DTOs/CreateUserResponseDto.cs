@@ -1,4 +1,4 @@
-namespace KeycloakAuth.DTOs;
+namespace AdegaRoyal.Api.DTOs;
 
 public class CreateUserResponseDto
 {

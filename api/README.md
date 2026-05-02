@@ -1,6 +1,6 @@
 # Adega Royal API — Guia de Uso
 
-Base URL local: `http://localhost:5065/swagger/index.html`
+Base URL local: `http://localhost:5065`
 
 ---
 
@@ -266,12 +266,12 @@ curl http://localhost:5065/health
 ```json
 "Keycloak": {
   "BaseUrl": "http://localhost:8080",
-  "Realm": "auth-demo",
+  "Realm": "adega-royal",
   "AdminUsername": "admin",
   "AdminPassword": "admin",
-  "PublicClientId": "public-client"
+  "PublicClientId": "adega-client"
 }
 ```
 
 > `AdminUsername`/`AdminPassword` são as credenciais `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` do `docker-compose.yml`.
-> O `admin-cli` é usado como client público (sem secret) para obter o token de administração.
+> O `adega-client` é usado como client público (sem secret) para obter o token de administração.

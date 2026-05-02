@@ -1,6 +1,6 @@
-using KeycloakAuth.DTOs;
+using AdegaRoyal.Api.DTOs;
 
-namespace KeycloakAuth.Services;
+namespace AdegaRoyal.Api.Services;
 
 /// <summary>
 /// Abstraction for the Abacate Pay payment gateway.

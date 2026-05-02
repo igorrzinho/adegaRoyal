@@ -1,9 +1,9 @@
-using KeycloakAuth.DTOs;
-using KeycloakAuth.Services;
+using AdegaRoyal.Api.DTOs;
+using AdegaRoyal.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace KeycloakAuth.Controllers;
+namespace AdegaRoyal.Api.Controllers;
 
 /// <summary>
 /// API endpoints for managing products in the catalog.
@@ -17,6 +17,7 @@ public class ProductsController(IProductService productService) : ControllerBase
     /// </summary>
     [HttpGet]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(IEnumerable<ProductDto>), StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<ProductDto>>> GetAllProducts([FromQuery] Guid? categoryId)
     {
         if (categoryId.HasValue)
@@ -34,6 +35,8 @@ public class ProductsController(IProductService productService) : ControllerBase
     /// </summary>
     [HttpGet("{id:guid}")]
     [AllowAnonymous]
+    [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ProductDto>> GetProductById(Guid id)
     {
         var product = await productService.GetProductByIdAsync(id);
@@ -47,7 +50,11 @@ public class ProductsController(IProductService productService) : ControllerBase
     /// Create a new product (Admin only).
     /// </summary>
     [HttpPost]
-    [Authorize(Roles = "admin")]
+    [Authorize(Policy = "AdminOnly")]
+    [ProducesResponseType(typeof(ProductDto), StatusCodes.Status201Created)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     public async Task<ActionResult<ProductDto>> CreateProduct([FromBody] CreateProductDto dto)
     {
         if (!ModelState.IsValid)
@@ -68,7 +75,12 @@ public class ProductsController(IProductService productService) : ControllerBase
     /// Update an existing product (Admin only).
     /// </summary>
     [HttpPut("{id:guid}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Policy = "AdminOnly")]
+    [ProducesResponseType(typeof(ProductDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<ActionResult<ProductDto>> UpdateProduct(Guid id, [FromBody] UpdateProductDto dto)
     {
         if (!ModelState.IsValid)
@@ -92,7 +104,11 @@ public class ProductsController(IProductService productService) : ControllerBase
     /// Delete a product (Admin only).
     /// </summary>
     [HttpDelete("{id:guid}")]
-    [Authorize(Roles = "admin")]
+    [Authorize(Policy = "AdminOnly")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteProduct(Guid id)
     {
         var success = await productService.DeleteProductAsync(id);
